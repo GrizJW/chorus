@@ -1,0 +1,151 @@
+# Chorus
+
+Unified live-stream chat for **Twitch**, **YouTube**, and **TikTok** — one dark, streamer-friendly UI with platform icons and native role badges.
+
+![Stack](https://img.shields.io/badge/TypeScript-Vite%20%2B%20React%20%2B%20Node-8b7cff)
+
+## Features
+
+- Platform icon on every message (Twitch / YouTube / TikTok)
+- Role badges next to usernames (subs, mods, VIPs, members, gifters, …)
+- Timestamps, auto-scroll with **pause-on-hover**, jump-to-latest
+- Filter chat by platform
+- Add streams via channel URL or username/handle
+- **Demo mode** with sample messages + badges (no API keys)
+- Live connectors: Twitch (IRC + Helix badges), YouTube (Live Chat API), TikTok (unofficial Webcast)
+
+## Quick start
+
+```bash
+git clone https://github.com/GrizJW/chorus.git
+cd chorus
+cp .env.example .env
+npm install
+npm run dev
+```
+
+- UI: http://localhost:5173  
+- API / WebSocket: http://localhost:8787 (`/ws`)
+
+Demo mode is **on by default** (`DEMO_MODE=true`). You will see mock Twitch / YouTube / TikTok messages with icons and example badges immediately.
+
+### Production-ish local run
+
+```bash
+npm run build
+DEMO_MODE=true npm start
+# serves API + built client on PORT (default 8787)
+```
+
+## Live mode
+
+1. Set `DEMO_MODE=false` in `.env`
+2. Add credentials below as needed
+3. Restart `npm run dev`
+4. Paste a channel URL or username in the sidebar
+
+### Credentials
+
+| Platform | Required for live chat? | Env vars | Notes |
+| --- | --- | --- | --- |
+| **Twitch** | No for public chat | `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET` (optional) | Anonymous `tmi.js` IRC reads public chat. Helix app token improves **channel-specific sub badge images** and display-name resolve. Create an app at [Twitch Dev Console](https://dev.twitch.tv/console/apps). |
+| **YouTube** | Yes | `YOUTUBE_API_KEY` | Enable **YouTube Data API v3** in [Google Cloud Console](https://console.cloud.google.com/apis/library/youtube.googleapis.com). API key is enough to poll public live chat. Channel must be **currently live** (or paste a live video URL). |
+| **TikTok** | No official keys | optional `TIKTOK_SESSION_ID` | Uses unofficial `tiktok-live-connector`. Creator must be **LIVE**. No ByteDance developer program for chat. |
+
+Example `.env` for live:
+
+```env
+DEMO_MODE=false
+PORT=8787
+CLIENT_ORIGIN=http://localhost:5173
+TWITCH_CLIENT_ID=your_client_id
+TWITCH_CLIENT_SECRET=your_client_secret
+YOUTUBE_API_KEY=your_api_key
+# TIKTOK_SESSION_ID=   # optional cookie sessionid if connections fail
+```
+
+### Accepted stream inputs
+
+- **Twitch:** `https://twitch.tv/shroud`, `shroud`, `twitch:shroud`
+- **YouTube:** `https://youtube.com/@handle`, `https://youtube.com/watch?v=…`, `youtube:@handle`
+- **TikTok:** `https://tiktok.com/@user/live`, `tiktok:user`, `@user` (TikTok-leaning bare handle)
+
+## Badges per platform
+
+### Twitch
+
+| Source | What you get |
+| --- | --- |
+| IRC tags (`tmi.js`) | `badges` map: broadcaster, moderator, VIP, subscriber (+ months via `badge-info`), bits, turbo, premium/Prime, staff, founder, etc. |
+| Helix `Get Global/Channel Chat Badges` | Real **image URLs** for global + channel-specific sub badges when `TWITCH_CLIENT_ID` + secret are set |
+| Fallback | Well-known static CDN URLs for common global badges (used in demo + when Helix is unset) |
+
+Badges render as **images** next to the username (with pill fallback if an image fails).
+
+### YouTube
+
+Official **Live Streaming API** `authorDetails`:
+
+| Flag | Chorus badge |
+| --- | --- |
+| `isChatOwner` | OWNER pill |
+| `isChatModerator` | MOD pill |
+| `isChatSponsor` | MEMBER pill |
+| `isVerified` | Verified pill |
+
+Also surfaces Super Chat / Super Sticker / membership events as donation chips.
+
+**Honest limit:** The public API does **not** expose membership **tier badge images** or months. Chorus shows clear role pills (and avatar when provided) rather than inventing fake badge art. Scraping internal `youtubei` endpoints is intentionally avoided for maintainability and ToS reasons.
+
+### TikTok
+
+There is **no official** public Live Chat API. Chorus uses [`tiktok-live-connector`](https://github.com/zerodytrash/TikTok-Live-Connector) (Webcast reverse engineering).
+
+When the connector provides them, Chorus maps:
+
+- Moderator / operator flags → MOD-style badge
+- Gifter level → `Gifter Lv.N` pill
+- Fan club / team member → FAN pill
+- `userBadges` image URLs when present
+- Gift events → donation chip (gift name, combo, diamonds)
+
+**Honest limits:**
+
+- Unofficial — can break when TikTok changes Webcast/signing
+- Streamer must be **live**; offline usernames fail to connect
+- Badge fields differ by library version / region; not every role TikTok shows in-app is always present
+- Not affiliated with ByteDance; use for personal/overlay tooling, not as a guaranteed production SLA
+
+## Architecture
+
+```
+chorus/
+  client/          Vite + React UI (dark chat, filters, badges)
+  server/          Express + WebSocket hub
+    adapters/      twitch.ts | youtube.ts | tiktok.ts | demo.ts
+  shared/          ChatMessage, Badge, StreamSource types
+```
+
+- **Adapters** normalize each platform into a shared `ChatMessage` with `badges[]`
+- **ChatHub** fans messages out over WebSocket (`/ws`) and REST (`/api/streams`)
+- **DemoAdapter** injects scripted multi-platform chat so UI works with zero keys
+
+```
+Browser ──WS──► ChatHub ──► TwitchAdapter (tmi.js + Helix badges)
+                     ├──► YouTubeAdapter (googleapis liveChatMessages)
+                     ├──► TikTokAdapter (tiktok-live-connector)
+                     └──► DemoAdapter (sample feed)
+```
+
+## Scripts
+
+| Command | Description |
+| --- | --- |
+| `npm run dev` | API + Vite concurrently |
+| `npm run build` | Build client (+ typecheck server via tsc) |
+| `npm start` | Serve API (and built client when `NODE_ENV=production`) |
+| `npm run typecheck` | TypeScript check |
+
+## License
+
+MIT — built for GrizJW / Chorus.
