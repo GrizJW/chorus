@@ -12,7 +12,10 @@
     "build:client": "vite build --config client/vite.config.ts",
     "build:server": "tsc -p server/tsconfig.json",
     "start": "NODE_ENV=production tsx server/src/index.ts",
-    "typecheck": "tsc -p server/tsconfig.json --noEmit && tsc -p client/tsconfig.json --noEmit"
+    "typecheck": "tsc -p server/tsconfig.json --noEmit && tsc -p client/tsconfig.json --noEmit",
+    "electron:dev": "npm run build && CHORUS_ELECTRON=1 electron .",
+    "electron:build": "npm run build && electron-builder --win",
+    "electron:build:dir": "npm run build && electron-builder --win --dir"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -34,10 +37,67 @@
     "@types/ws": "^8.5.13",
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.2",
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vite": "^6.0.7"
+  },
+  "main": "electron/main.cjs",
+  "build": {
+    "appId": "com.grizjw.chorus",
+    "productName": "Chorus",
+    "copyright": "Copyright © 2026 GrizJW",
+    "directories": {
+      "output": "release",
+      "buildResources": "electron/resources"
+    },
+    "files": [
+      "electron/**/*",
+      "client/dist/**/*",
+      "server/dist/**/*",
+      "shared/**/*",
+      "package.json",
+      "!electron/resources/**/*"
+    ],
+    "extraMetadata": {
+      "main": "electron/main.cjs"
+    },
+    "asar": true,
+    "asarUnpack": [
+      "server/**/*",
+      "client/dist/**/*",
+      "**/*.node"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Chorus"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-${arch}-portable.${ext}"
+    }
   }
 }

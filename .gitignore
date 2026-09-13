@@ -2,8 +2,11 @@ node_modules/
 dist/
 client/dist/
 server/dist/
+release/
 .env
 .env.local
 *.log
 .DS_Store
 .vite/
+*.exe
+*.blockmap

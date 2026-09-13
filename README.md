@@ -14,7 +14,19 @@ Unified live-stream chat for **Twitch**, **YouTube**, and **TikTok** — one dar
 - Optional **demo mode** (`DEMO_MODE=true`) with sample messages + badges (no API keys)
 - Live connectors: Twitch (IRC + Helix badges), YouTube (Live Chat API), TikTok (unofficial Webcast)
 
-## Quick start
+## Download Windows (no npm)
+
+Grab the latest **Windows installer or portable `.exe`** from [GitHub Releases](https://github.com/GrizJW/chorus/releases):
+
+1. Open the newest release (e.g. `v1.0.0`)
+2. Download **`Chorus-1.0.0-x64.exe`** (NSIS installer) or **`Chorus-1.0.0-x64-portable.exe`** (no install)
+3. Run it — paste Twitch / YouTube / TikTok stream links in the sidebar
+
+The app is **unsigned** for v1, so Windows SmartScreen may warn (“Windows protected your PC”). Choose **More info → Run anyway**.
+
+Optional YouTube API key (and other env vars): create a `.env` file in the app’s user-data folder (`%APPDATA%\Chorus\.env` on Windows) using the same keys as `.env.example`.
+
+## Quick start (contributors)
 
 ```bash
 git clone https://github.com/GrizJW/chorus.git
@@ -132,6 +144,7 @@ chorus/
   client/          Vite + React UI (dark chat, filters, badges)
   server/          Express + WebSocket hub
     adapters/      twitch.ts | youtube.ts | tiktok.ts | demo.ts
+  electron/        Desktop shell (starts API, loads built UI)
   shared/          ChatMessage, Badge, StreamSource types
 ```
 
@@ -151,9 +164,13 @@ Browser ──WS──► ChatHub ──► TwitchAdapter (tmi.js + Helix badges
 | Command | Description |
 | --- | --- |
 | `npm run dev` | API + Vite concurrently |
-| `npm run build` | Build client (+ typecheck server via tsc) |
+| `npm run build` | Build client + compile server |
 | `npm start` | Serve API (and built client when `NODE_ENV=production`) |
 | `npm run typecheck` | TypeScript check |
+| `npm run electron:dev` | Build then launch Electron desktop shell |
+| `npm run electron:build` | Build Windows installer + portable `.exe` (via electron-builder) |
+
+Tagged releases (`v*`) trigger GitHub Actions on `windows-latest` to publish `.exe` assets to [Releases](https://github.com/GrizJW/chorus/releases).
 
 ## License
 

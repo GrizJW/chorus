@@ -3,10 +3,12 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "..",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "types": ["node"],
-    "noEmit": true
+    "noEmit": false,
+    "declaration": false,
+    "sourceMap": true
   },
   "include": ["src/**/*", "../shared/**/*"]
 }
