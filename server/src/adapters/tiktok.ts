@@ -1,4 +1,10 @@
 import { randomUUID } from 'crypto';
+import {
+  ControlEvent,
+  TikTokLiveConnection,
+  WebcastEvent,
+  type TikTokLiveConstructorConnectionOptions,
+} from 'tiktok-live-connector';
 import type { ChatBadge, ChatMessage, StreamSource } from '../../../shared/types.js';
 import type { MessageHandler, PlatformAdapter, StatusHandler } from './types.js';
 import { createSourceId } from './types.js';
@@ -6,24 +12,94 @@ import { parseStreamInput } from './parseInput.js';
 
 /**
  * TikTok has no official public Live Chat API.
- * We use `tiktok-live-connector` (unofficial Webcast reverse-engineering).
+ * We use `tiktok-live-connector` v2 (TikTokLiveConnection + Euler signing).
  * Badges/roles available vary by stream and library version: moderator,
  * gifter level, fan club, and top-gifter style badges when present on the
  * user object. Gift events are surfaced as donation messages.
  *
  * Limitations are documented in README — expect breakage if TikTok changes
  * their Webcast protocol; creator must be LIVE to connect.
+ *
+ * If signing returns 403, set TIKTOK_SESSION_ID (TikTok `sessionid` cookie)
+ * in %APPDATA%\Chorus\.env (Electron) or project .env, optionally with
+ * TIKTOK_TT_TARGET_IDC (e.g. useast1a).
  */
-
-type TikTokConnection = {
-  connect: () => Promise<unknown>;
-  disconnect: () => void;
-  on: (event: string, cb: (...args: unknown[]) => void) => void;
-};
 
 interface TTState {
   source: StreamSource;
-  connection: TikTokConnection | null;
+  connection: TikTokLiveConnection | null;
+}
+
+function resolveTikTokSessionId(): string | undefined {
+  const raw =
+    process.env.TIKTOK_SESSION_ID?.trim() ||
+    process.env.TIKTOK_SESSIONID?.trim() ||
+    '';
+  return raw || undefined;
+}
+
+function resolveTikTokTargetIdc(): string {
+  return (
+    process.env.TIKTOK_TT_TARGET_IDC?.trim() ||
+    process.env.TIKTOK_TARGET_IDC?.trim() ||
+    'useast1a'
+  );
+}
+
+function resolveSignApiKey(): string | undefined {
+  const raw =
+    process.env.TIKTOK_SIGN_API_KEY?.trim() ||
+    process.env.SIGN_API_KEY?.trim() ||
+    '';
+  return raw || undefined;
+}
+
+function formatTikTokConnectError(uniqueId: string, err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  const lower = message.toLowerCase();
+  const appdataHint =
+    'Set TIKTOK_SESSION_ID (your TikTok sessionid cookie while logged in) in %APPDATA%\\Chorus\\.env and reconnect. Creator must be LIVE.';
+
+  if (
+    lower.includes('403') ||
+    lower.includes('failed to sign') ||
+    lower.includes('sign request') ||
+    lower.includes('signapi') ||
+    lower.includes('signature')
+  ) {
+    return `TikTok signing failed (403). ${appdataHint} Details: ${message}`;
+  }
+
+  if (
+    lower.includes('offline') ||
+    lower.includes('not live') ||
+    lower.includes("isn't live") ||
+    lower.includes('is not live') ||
+    lower.includes('useroffline') ||
+    lower.includes('room id') ||
+    lower.includes('retrieve room')
+  ) {
+    return `Creator @${uniqueId} does not appear to be LIVE right now. ${message}`;
+  }
+
+  return message;
+}
+
+function errorMessageFromEventArg(arg: unknown): string {
+  if (arg instanceof Error) return arg.message;
+  if (arg && typeof arg === 'object') {
+    const obj = arg as { exception?: unknown; info?: unknown; message?: unknown };
+    if (obj.exception instanceof Error) return obj.exception.message;
+    if (typeof obj.exception === 'string' && obj.exception) return obj.exception;
+    if (typeof obj.message === 'string' && obj.message) return obj.message;
+    if (typeof obj.info === 'string' && obj.info) return obj.info;
+    try {
+      return JSON.stringify(arg);
+    } catch {
+      return String(arg);
+    }
+  }
+  return String(arg);
 }
 
 export class TikTokAdapter implements PlatformAdapter {
@@ -72,44 +148,50 @@ export class TikTokAdapter implements PlatformAdapter {
     this.emitStatus(source);
 
     try {
-      const mod = await import('tiktok-live-connector');
-      // Support both v1 (WebcastPushConnection) and v2 (TikTokLiveConnection) exports
-      const ConnClass =
-        (mod as { WebcastPushConnection?: new (u: string, o?: object) => TikTokConnection })
-          .WebcastPushConnection ??
-        (mod as { TikTokLiveConnection?: new (u: string, o?: object) => TikTokConnection })
-          .TikTokLiveConnection;
-
-      if (!ConnClass) {
-        throw new Error('tiktok-live-connector export not found');
-      }
-
-      const options: Record<string, unknown> = {
+      const options: TikTokLiveConstructorConnectionOptions = {
         processInitialData: true,
         enableExtendedGiftInfo: true,
+        fetchRoomInfoOnConnect: true,
       };
-      if (process.env.TIKTOK_SESSION_ID) {
-        options.sessionId = process.env.TIKTOK_SESSION_ID;
+
+      const signApiKey = resolveSignApiKey();
+      if (signApiKey) {
+        options.signApiKey = signApiKey;
       }
 
-      const connection = new ConnClass(uniqueId, options);
+      const sessionId = resolveTikTokSessionId();
+      if (sessionId) {
+        options.session = {
+          cookie: {
+            type: 'cookie',
+            value: {
+              sessionId,
+              ttTargetIdc: resolveTikTokTargetIdc(),
+            },
+          },
+        };
+      }
 
-      connection.on('chat', (...args: unknown[]) => {
+      // v2 class extends TypedEventEmitter at runtime; DT declaration omits `.on` on the class body.
+      const connection = new TikTokLiveConnection(uniqueId, options);
+      const emitter = connection as TikTokLiveConnection & {
+        on: (event: string | symbol, cb: (...args: unknown[]) => void) => unknown;
+      };
+
+      emitter.on(WebcastEvent.CHAT, (...args: unknown[]) => {
         const data = args[0] as Record<string, unknown>;
         const msg = mapTikTokChat(data, source);
         if (msg) this.emitMessage(msg);
       });
 
-      connection.on('gift', (...args: unknown[]) => {
+      emitter.on(WebcastEvent.GIFT, (...args: unknown[]) => {
         const data = args[0] as Record<string, unknown>;
         const msg = mapTikTokGift(data, source);
         if (msg) this.emitMessage(msg);
       });
 
-      // Some versions use enum-style WebcastEvent
-      connection.on('error', (...args: unknown[]) => {
-        const err = args[0];
-        const message = err instanceof Error ? err.message : String(err);
+      emitter.on(ControlEvent.ERROR, (...args: unknown[]) => {
+        const message = errorMessageFromEventArg(args[0]);
         const updated = { ...source, connected: false, error: message };
         this.channels.set(sourceId, {
           source: updated,
@@ -118,13 +200,13 @@ export class TikTokAdapter implements PlatformAdapter {
         this.emitStatus(updated);
       });
 
-      connection.on('disconnected', () => {
+      emitter.on(ControlEvent.DISCONNECTED, () => {
         const updated = { ...source, connected: false, error: 'Disconnected' };
         this.channels.set(sourceId, { source: updated, connection });
         this.emitStatus(updated);
       });
 
-      connection.on('streamEnd', () => {
+      emitter.on(WebcastEvent.STREAM_END, () => {
         const updated = { ...source, connected: false, error: 'Stream ended' };
         this.channels.set(sourceId, { source: updated, connection });
         this.emitStatus(updated);
@@ -141,18 +223,15 @@ export class TikTokAdapter implements PlatformAdapter {
       this.emitStatus(connected);
       return connected;
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const friendly = formatTikTokConnectError(uniqueId, err);
       const failed: StreamSource = {
         ...source,
         connected: false,
-        error:
-          message.includes('LIVE') || message.includes('offline')
-            ? `Creator @${uniqueId} does not appear to be LIVE right now. ${message}`
-            : message,
+        error: friendly,
       };
       this.channels.set(sourceId, { source: failed, connection: null });
       this.emitStatus(failed);
-      throw new Error(failed.error);
+      throw new Error(friendly);
     }
   }
 
@@ -220,8 +299,7 @@ export function extractTikTokBadges(
         (typeof b.url === 'string' && b.url) ||
         (Array.isArray((b as { url?: string[] }).url)
           ? (b as { url: string[] }).url[0]
-          : undefined) ||
-        (typeof b.displayType === 'string' ? undefined : undefined);
+          : undefined);
       const imageUrl =
         url ||
         (typeof (b as { imageUrl?: string }).imageUrl === 'string'
@@ -236,7 +314,6 @@ export function extractTikTokBadges(
     }
   }
 
-  // Moderator / operator flags (field names vary by connector version)
   if (user.isModerator || user.user_moderator || data.isModerator) {
     if (!badges.some((b) => b.id.includes('mod'))) {
       badges.push({ id: 'moderator', label: 'Moderator', color: '#20d5ec' });
@@ -298,19 +375,37 @@ function mapTikTokGift(
   source: StreamSource,
 ): ChatMessage | null {
   const u = mapTikTokUser(data);
-  const giftMeta = (data.gift ?? data.extendedGiftInfo ?? {}) as {
+  const giftDetails = (data.giftDetails ?? data.gift ?? {}) as Record<string, unknown>;
+  const giftMeta = (data.extendedGiftInfo ?? {}) as {
     name?: string;
     repeat_count?: number;
     diamond_count?: number;
   };
   const giftName = String(
-    (data.giftName as string) ?? giftMeta.name ?? 'Gift',
+    (data.giftName as string) ??
+      giftDetails.giftName ??
+      giftDetails.name ??
+      giftMeta.name ??
+      'Gift',
   );
-  const repeat = Number(data.repeatCount ?? giftMeta.repeat_count ?? 1);
+  const repeat = Number(
+    data.repeatCount ?? giftDetails.repeatCount ?? giftMeta.repeat_count ?? 1,
+  );
   const diamonds = Number(
-    data.diamondCount ?? data.diamond_count ?? giftMeta.diamond_count ?? 0,
+    data.diamondCount ??
+      data.diamond_count ??
+      giftDetails.diamondCount ??
+      giftDetails.diamond_count ??
+      giftMeta.diamond_count ??
+      0,
   );
   const describe = String(data.describe ?? `${u.displayName} sent ${giftName}`);
+
+  // Skip in-progress streak ticks for streakable gifts (giftType === 1)
+  const giftType = Number(giftDetails.giftType ?? data.giftType ?? 0);
+  if (giftType === 1 && data.repeatEnd === false) {
+    return null;
+  }
 
   return {
     id: String(data.msgId ?? randomUUID()),

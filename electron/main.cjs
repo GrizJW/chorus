@@ -36,16 +36,16 @@ function resolveAppPath(...parts) {
 function loadUserEnv() {
   try {
     const dotenv = require('dotenv');
-    const candidates = [
-      path.join(app.getPath('userData'), '.env'),
-      resolveAppPath('.env'),
-    ];
-    for (const p of candidates) {
-      if (fs.existsSync(p)) {
-        dotenv.config({ path: p });
-        console.log(`Loaded env from ${p}`);
-        return;
-      }
+    // Packaged defaults first, then %APPDATA%\Chorus\.env overrides (session cookies, API keys).
+    const defaultsPath = resolveAppPath('.env');
+    const userPath = path.join(app.getPath('userData'), '.env');
+    if (fs.existsSync(defaultsPath)) {
+      dotenv.config({ path: defaultsPath });
+      console.log(`Loaded env defaults from ${defaultsPath}`);
+    }
+    if (fs.existsSync(userPath)) {
+      dotenv.config({ path: userPath, override: true });
+      console.log(`Loaded user env from ${userPath}`);
     }
   } catch (err) {
     console.warn('dotenv load skipped:', err);
