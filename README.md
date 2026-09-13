@@ -6,12 +6,12 @@ Unified live-stream chat for **Twitch**, **YouTube**, and **TikTok** — one dar
 
 ## Features
 
+- Paste Twitch / YouTube / TikTok stream links and they connect
 - Platform icon on every message (Twitch / YouTube / TikTok)
 - Role badges next to usernames (subs, mods, VIPs, members, gifters, …)
 - Timestamps, auto-scroll with **pause-on-hover**, jump-to-latest
 - Filter chat by platform
-- Add streams via channel URL or username/handle
-- **Demo mode** with sample messages + badges (no API keys)
+- Optional **demo mode** (`DEMO_MODE=true`) with sample messages + badges (no API keys)
 - Live connectors: Twitch (IRC + Helix badges), YouTube (Live Chat API), TikTok (unofficial Webcast)
 
 ## Quick start
@@ -27,24 +27,31 @@ npm run dev
 - UI: http://localhost:5173  
 - API / WebSocket: http://localhost:8787 (`/ws`)
 
-Demo mode is **on by default** (`DEMO_MODE=true`). You will see mock Twitch / YouTube / TikTok messages with icons and example badges immediately.
+**Paste a stream link** in the sidebar (Twitch, YouTube, or TikTok) and hit Connect. Live mode is the default (`DEMO_MODE=false`).
+
+- **Twitch** — works from a channel link / username; no keys required for public chat
+- **TikTok** — works from `@user/live` (or short links when resolvable); creator must be **LIVE**; no keys
+- **YouTube** — paste works, but you need `YOUTUBE_API_KEY` in `.env` once (YouTube Data API v3)
+
+### Optional demo mode
+
+To try sample multi-platform chat without connecting live streams:
+
+```env
+DEMO_MODE=true
+```
+
+Restart the server. Demo mode replaces live connectors with scripted messages.
 
 ### Production-ish local run
 
 ```bash
 npm run build
-DEMO_MODE=true npm start
+npm start
 # serves API + built client on PORT (default 8787)
 ```
 
-## Live mode
-
-1. Set `DEMO_MODE=false` in `.env`
-2. Add credentials below as needed
-3. Restart `npm run dev`
-4. Paste a channel URL or username in the sidebar
-
-### Credentials
+## Credentials
 
 | Platform | Required for live chat? | Env vars | Notes |
 | --- | --- | --- | --- |
@@ -52,23 +59,25 @@ DEMO_MODE=true npm start
 | **YouTube** | Yes | `YOUTUBE_API_KEY` | Enable **YouTube Data API v3** in [Google Cloud Console](https://console.cloud.google.com/apis/library/youtube.googleapis.com). API key is enough to poll public live chat. Channel must be **currently live** (or paste a live video URL). |
 | **TikTok** | No official keys | optional `TIKTOK_SESSION_ID` | Uses unofficial `tiktok-live-connector`. Creator must be **LIVE**. No ByteDance developer program for chat. |
 
-Example `.env` for live:
+Example `.env` (live by default):
 
 ```env
 DEMO_MODE=false
 PORT=8787
 CLIENT_ORIGIN=http://localhost:5173
-TWITCH_CLIENT_ID=your_client_id
-TWITCH_CLIENT_SECRET=your_client_secret
-YOUTUBE_API_KEY=your_api_key
+# Optional Twitch Helix (better badges):
+# TWITCH_CLIENT_ID=your_client_id
+# TWITCH_CLIENT_SECRET=your_client_secret
+# Required only for YouTube:
+# YOUTUBE_API_KEY=your_api_key
 # TIKTOK_SESSION_ID=   # optional cookie sessionid if connections fail
 ```
 
 ### Accepted stream inputs
 
-- **Twitch:** `https://twitch.tv/shroud`, `shroud`, `twitch:shroud`
-- **YouTube:** `https://youtube.com/@handle`, `https://youtube.com/watch?v=…`, `youtube:@handle`
-- **TikTok:** `https://tiktok.com/@user/live`, `tiktok:user`, `@user` (TikTok-leaning bare handle)
+- **Twitch:** `https://twitch.tv/shroud`, `https://m.twitch.tv/shroud`, `shroud`, `twitch:shroud`
+- **YouTube:** `https://youtube.com/@handle`, `https://youtube.com/live/…`, `https://youtube.com/watch?v=…`, `youtube:@handle`
+- **TikTok:** `https://www.tiktok.com/@user/live`, `vm.tiktok.com/…` (resolved when possible), `tiktok:user`, `@user`
 
 ## Badges per platform
 
@@ -128,13 +137,13 @@ chorus/
 
 - **Adapters** normalize each platform into a shared `ChatMessage` with `badges[]`
 - **ChatHub** fans messages out over WebSocket (`/ws`) and REST (`/api/streams`)
-- **DemoAdapter** injects scripted multi-platform chat so UI works with zero keys
+- **DemoAdapter** injects scripted multi-platform chat when `DEMO_MODE=true`
 
 ```
 Browser ──WS──► ChatHub ──► TwitchAdapter (tmi.js + Helix badges)
                      ├──► YouTubeAdapter (googleapis liveChatMessages)
                      ├──► TikTokAdapter (tiktok-live-connector)
-                     └──► DemoAdapter (sample feed)
+                     └──► DemoAdapter (sample feed, optional)
 ```
 
 ## Scripts

@@ -1,5 +1,5 @@
 import type { ChatMessage, StreamSource } from '../../../shared/types.js';
-import { parseStreamInput } from '../adapters/parseInput.js';
+import { parseStreamInput, resolveStreamInput } from '../adapters/parseInput.js';
 import { TwitchAdapter } from '../adapters/twitch.js';
 import { YouTubeAdapter } from '../adapters/youtube.js';
 import { TikTokAdapter } from '../adapters/tiktok.js';
@@ -22,7 +22,7 @@ export class ChatHub {
   private readonly maxRecent = 300;
 
   constructor() {
-    this.demoMode = (process.env.DEMO_MODE ?? 'true').toLowerCase() !== 'false';
+    this.demoMode = (process.env.DEMO_MODE ?? 'false').toLowerCase() === 'true';
 
     const wire = (adapter: PlatformAdapter) => {
       adapter.onMessage((msg) => this.pushMessage(msg));
@@ -63,9 +63,10 @@ export class ChatHub {
         'Demo mode is on (DEMO_MODE=true). Set DEMO_MODE=false in .env to connect live streams.',
       );
     }
-    const parsed = parseStreamInput(input);
+    const resolved = await resolveStreamInput(input);
+    const parsed = parseStreamInput(resolved);
     const adapter = this.adapterFor(parsed.platform);
-    return adapter.connect(input);
+    return adapter.connect(resolved);
   }
 
   async removeStream(id: string): Promise<void> {

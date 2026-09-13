@@ -16,7 +16,7 @@ function wsUrl(): string {
 export function useChatSocket() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streams, setStreams] = useState<StreamSource[]>([]);
-  const [demoMode, setDemoMode] = useState(true);
+  const [demoMode, setDemoMode] = useState(false);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);

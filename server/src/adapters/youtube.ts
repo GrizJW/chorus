@@ -50,7 +50,7 @@ export class YouTubeAdapter implements PlatformAdapter {
   private ensureClient(): youtube_v3.Youtube {
     if (!this.apiKey) {
       throw new Error(
-        'YOUTUBE_API_KEY is required for live YouTube chat. Set it in .env or use Demo mode.',
+        'Paste works, but YouTube needs YOUTUBE_API_KEY in .env once (enable YouTube Data API v3). Twitch and TikTok connect from links without keys — TikTok only when the creator is LIVE.',
       );
     }
     if (!this.yt) {

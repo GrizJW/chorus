@@ -51,18 +51,16 @@ export function Sidebar({
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="URL or username…"
-            disabled={demoMode}
+            placeholder="Paste a Twitch, YouTube, or TikTok link…"
             aria-label="Stream URL or username"
           />
-          <button className="primary" type="submit" disabled={demoMode || busy || !input.trim()}>
+          <button className="primary" type="submit" disabled={busy || !input.trim()}>
             {busy ? 'Connecting…' : 'Connect'}
           </button>
         </form>
         <p className="hint">
-          {demoMode
-            ? 'Demo mode is streaming sample messages with badges. Set DEMO_MODE=false in .env for live connectors.'
-            : 'Twitch: twitch.tv/name · YouTube: youtube.com/@handle or live URL · TikTok: tiktok.com/@user/live or tiktok:user'}
+          Examples: twitch.tv/name · youtube.com/@handle · youtube.com/live/… ·
+          tiktok.com/@user/live
         </p>
 
         {error && <div className="error-banner">{error}</div>}
@@ -70,7 +68,7 @@ export function Sidebar({
         <h2>Channels ({streams.length})</h2>
         <div className="stream-list">
           {streams.length === 0 && (
-            <p className="hint">No channels connected yet.</p>
+            <p className="hint">No channels connected yet. Paste a stream link above.</p>
           )}
           {streams.map((s) => (
             <div key={s.id} className="stream-item">
