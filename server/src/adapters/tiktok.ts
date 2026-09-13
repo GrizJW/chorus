@@ -20,9 +20,14 @@ import { parseStreamInput } from './parseInput.js';
  * Limitations are documented in README — expect breakage if TikTok changes
  * their Webcast protocol; creator must be LIVE to connect.
  *
- * If signing returns 403, set TIKTOK_SESSION_ID (TikTok `sessionid` cookie)
- * in %APPDATA%\Chorus\.env (Electron) or project .env, optionally with
- * TIKTOK_TT_TARGET_IDC (e.g. useast1a).
+ * Chat connect uses free Euler rooms signing. Gift catalog prefetch is off
+ * (enableExtendedGiftInfo: false) so Business-plan gift/list signing is not used.
+ * Gift chat events still arrive over the Webcast socket.
+ *
+ * If signing still returns 403 after updating, optionally set TIKTOK_SESSION_ID
+ * (TikTok `sessionid` cookie) and/or a free Euler Community key as
+ * TIKTOK_SIGN_API_KEY in %APPDATA%\Chorus\.env (Electron) or project .env,
+ * optionally with TIKTOK_TT_TARGET_IDC (e.g. useast1a). Do not buy Business.
  */
 
 interface TTState {
@@ -59,6 +64,21 @@ function formatTikTokConnectError(uniqueId: string, err: unknown): string {
   const lower = message.toLowerCase();
   const appdataHint =
     'Set TIKTOK_SESSION_ID (your TikTok sessionid cookie while logged in) in %APPDATA%\\Chorus\\.env and reconnect. Creator must be LIVE.';
+
+  // Paid Euler gift-catalog signing — Chorus bug in older builds; do NOT buy Business.
+  if (
+    lower.includes('business plan') ||
+    lower.includes('eulerstream.com/pricing') ||
+    lower.includes('premiumfeature') ||
+    lower.includes('requires a business')
+  ) {
+    return (
+      'TikTok connect failed due to a Chorus bug (gift catalog signing used a paid Euler route). ' +
+      'Do NOT purchase an Euler Business plan. Update to Chorus 1.0.2+ and reconnect while the creator is LIVE. ' +
+      'Session cookie is optional; only if connect still fails after updating, set a free Euler Community API key as TIKTOK_SIGN_API_KEY in %APPDATA%\\Chorus\\.env. ' +
+      `Details: ${message}`
+    );
+  }
 
   if (
     lower.includes('403') ||
@@ -150,7 +170,7 @@ export class TikTokAdapter implements PlatformAdapter {
     try {
       const options: TikTokLiveConstructorConnectionOptions = {
         processInitialData: true,
-        enableExtendedGiftInfo: true,
+        enableExtendedGiftInfo: false, // gift events still arrive over WS; skip paid gift/list/ prefetch
         fetchRoomInfoOnConnect: true,
       };
 
