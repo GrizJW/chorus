@@ -1,6 +1,6 @@
 {
   "name": "chorus",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "description": "Unified live-stream chat from Twitch, YouTube, and TikTok",
   "type": "module",
@@ -25,7 +25,8 @@
     "tiktok-live-connector": "^2.4.4",
     "tmi.js": "^1.8.5",
     "uuid": "^11.0.5",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "youtubei.js": "^18.0.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
@@ -49,7 +50,7 @@
   "build": {
     "appId": "com.grizjw.chorus",
     "productName": "Chorus",
-    "copyright": "Copyright \u00a9 2026 GrizJW",
+    "copyright": "Copyright © 2026 GrizJW",
     "directories": {
       "output": "release",
       "buildResources": "electron/resources"

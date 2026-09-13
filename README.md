@@ -18,13 +18,13 @@ Unified live-stream chat for **Twitch**, **YouTube**, and **TikTok** — one dar
 
 Grab the latest **Windows installer or portable `.exe`** from [GitHub Releases](https://github.com/GrizJW/chorus/releases):
 
-1. Open the newest release (e.g. `v1.0.2`)
-2. Download **`Chorus-1.0.2-x64.exe`** (NSIS installer) or **`Chorus-1.0.2-x64-portable.exe`** (no install)
+1. Open the newest release (e.g. `v1.0.3`)
+2. Download **`Chorus-1.0.3-x64.exe`** (NSIS installer) or **`Chorus-1.0.3-x64-portable.exe`** (no install)
 3. Run it — paste Twitch / YouTube / TikTok stream links in the sidebar
 
 The app is **unsigned** for v1, so Windows SmartScreen may warn (“Windows protected your PC”). Choose **More info → Run anyway**.
 
-Optional YouTube API key / TikTok extras: create a `.env` file in the app’s user-data folder (`%APPDATA%\Chorus\.env` on Windows) using the same keys as `.env.example`. **No Euler Business plan is required for TikTok chat.** Session cookie / free Community API key are only fallbacks if connect still fails after updating.
+Optional extras (YouTube Data API key, TikTok session / Euler Community key): create a `.env` in `%APPDATA%\Chorus\.env` using `.env.example`. **YouTube chat needs no Google Cloud key** (Innertube). **No Euler Business plan** for TikTok chat.
 
 ## Quick start (contributors)
 
@@ -43,7 +43,7 @@ npm run dev
 
 - **Twitch** — works from a channel link / username; no keys required for public chat
 - **TikTok** — works from `@user/live` (or short links when resolvable); creator must be **LIVE**; no Euler Business plan needed. If connect still fails after updating, optionally set `TIKTOK_SESSION_ID` or a free Euler Community `TIKTOK_SIGN_API_KEY` in `%APPDATA%\Chorus\.env`
-- **YouTube** — paste works, but you need `YOUTUBE_API_KEY` in `.env` once (YouTube Data API v3)
+- **YouTube** — paste a live link / `@handle` while LIVE; **no API key required** (Innertube). Optional `YOUTUBE_API_KEY` is Data API fallback only
 
 ### Optional demo mode
 
@@ -68,7 +68,7 @@ npm start
 | Platform | Required for live chat? | Env vars | Notes |
 | --- | --- | --- | --- |
 | **Twitch** | No for public chat | `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET` (optional) | Anonymous `tmi.js` IRC reads public chat. Helix app token improves **channel-specific sub badge images** and display-name resolve. Create an app at [Twitch Dev Console](https://dev.twitch.tv/console/apps). |
-| **YouTube** | Yes | `YOUTUBE_API_KEY` | Enable **YouTube Data API v3** in [Google Cloud Console](https://console.cloud.google.com/apis/library/youtube.googleapis.com). API key is enough to poll public live chat. Channel must be **currently live** (or paste a live video URL). |
+| **YouTube** | **No** for basic chat | Optional `YOUTUBE_API_KEY` | Default: unofficial **Innertube** (`youtubei.js`) — paste a live URL or `@handle` while LIVE. Optional official Data API v3 key is fallback only if Innertube fails. |
 | **TikTok** | No official keys; **no Euler Business plan** | Optional `TIKTOK_SESSION_ID`, `TIKTOK_TT_TARGET_IDC`, free Community `TIKTOK_SIGN_API_KEY` | Uses unofficial `tiktok-live-connector` **v2** with free rooms signing (gift catalog prefetch disabled). Creator must be **LIVE**. Do not buy Euler Business for Chorus chat. |
 
 Example `.env` (live by default):
@@ -80,7 +80,7 @@ CLIENT_ORIGIN=http://localhost:5173
 # Optional Twitch Helix (better badges):
 # TWITCH_CLIENT_ID=your_client_id
 # TWITCH_CLIENT_SECRET=your_client_secret
-# Required only for YouTube:
+# Optional YouTube Data API fallback (Innertube needs no key):
 # YOUTUBE_API_KEY=your_api_key
 # TIKTOK_SESSION_ID=your_sessionid_cookie   # optional fallback if signing fails
 # TIKTOK_TT_TARGET_IDC=useast1a            # from tt-target-idc cookie (optional)
@@ -107,18 +107,27 @@ Badges render as **images** next to the username (with pill fallback if an image
 
 ### YouTube
 
-Official **Live Streaming API** `authorDetails`:
+Default path is unofficial **Innertube** via [`youtubei.js`](https://github.com/LuanRT/YouTube.js) (same web client endpoints the site uses). **No Google Cloud / `YOUTUBE_API_KEY` required** for public live chat.
 
-| Flag | Chorus badge |
+When the source provides them, Chorus maps:
+
+| Source signal | Chorus badge |
 | --- | --- |
-| `isChatOwner` | OWNER pill |
-| `isChatModerator` | MOD pill |
-| `isChatSponsor` | MEMBER pill |
-| `isVerified` | Verified pill |
+| Owner / creator | OWNER pill |
+| Moderator | MOD pill |
+| Member / sponsor (incl. custom badge image when present) | MEMBER pill |
+| Verified | Verified pill |
 
 Also surfaces Super Chat / Super Sticker / membership events as donation chips.
 
-**Honest limit:** The public API does **not** expose membership **tier badge images** or months. Chorus shows clear role pills (and avatar when provided) rather than inventing fake badge art. Scraping internal `youtubei` endpoints is intentionally avoided for maintainability and ToS reasons.
+Optional: set `YOUTUBE_API_KEY` to enable official Data API v3 as a **fallback** if Innertube fails.
+
+**Honest limits:**
+
+- Unofficial Innertube path — can break when Google changes internal clients
+- Streamer must be **live**; offline channels/handles fail to connect
+- Role badges depend on what Innertube (or the Data API) returns; tier images are best-effort
+- Not affiliated with Google/YouTube; personal/overlay tooling, not a production SLA
 
 ### TikTok
 
