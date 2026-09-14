@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import {
   ControlEvent,
+  SignConfig,
   TikTokLiveConnection,
   WebcastEvent,
   type TikTokLiveConstructorConnectionOptions,
@@ -24,10 +25,11 @@ import { parseStreamInput } from './parseInput.js';
  * (enableExtendedGiftInfo: false) so Business-plan gift/list signing is not used.
  * Gift chat events still arrive over the Webcast socket.
  *
- * If signing still returns 403 after updating, optionally set TIKTOK_SESSION_ID
- * (TikTok `sessionid` cookie) and/or a free Euler Community key as
- * TIKTOK_SIGN_API_KEY in %APPDATA%\Chorus\.env (Electron) or project .env,
- * optionally with TIKTOK_TT_TARGET_IDC (e.g. useast1a). Do not buy Business.
+ * Anonymous WebSocket connections often receive gifts but heavily filter chat.
+ * For full chat, set TIKTOK_SESSION_ID (+ optional TIKTOK_TT_TARGET_IDC) in
+ * %APPDATA%\Chorus\.env — Chorus then enables authenticateWs and whitelists
+ * the Euler sign host. Optionally set a free Euler Community key as
+ * TIKTOK_SIGN_API_KEY. Do not buy Business.
  */
 
 interface TTState {
@@ -59,6 +61,22 @@ function resolveSignApiKey(): string | undefined {
   return raw || undefined;
 }
 
+/** Host of the Euler sign API (for WHITELIST_AUTHENTICATED_SESSION_ID_HOST). */
+function resolveEulerSignHost(): string {
+  const base =
+    (typeof SignConfig.basePath === 'string' && SignConfig.basePath) ||
+    process.env.SIGN_API_URL ||
+    'https://api.eulerstream.com';
+  try {
+    return new URL(base).host;
+  } catch {
+    return 'api.eulerstream.com';
+  }
+}
+
+const SESSION_CHAT_HINT =
+  'Gifts may appear without a session, but full TikTok chat usually needs TIKTOK_SESSION_ID (+ optional TIKTOK_TT_TARGET_IDC) in %APPDATA%\\Chorus\\.env. Restart Chorus after editing.';
+
 function formatTikTokConnectError(uniqueId: string, err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);
   const lower = message.toLowerCase();
@@ -88,6 +106,17 @@ function formatTikTokConnectError(uniqueId: string, err: unknown): string {
     lower.includes('signature')
   ) {
     return `TikTok signing failed (403). ${appdataHint} Details: ${message}`;
+  }
+
+  if (
+    lower.includes('whitelist') ||
+    lower.includes('authenticatedwebsocket') ||
+    lower.includes('authenticate_websocket')
+  ) {
+    return (
+      `TikTok authenticated WebSocket failed. Ensure WHITELIST is set automatically (restart Chorus) and TIKTOK_SESSION_ID is valid. ` +
+      `Details: ${message}`
+    );
   }
 
   if (
@@ -168,28 +197,39 @@ export class TikTokAdapter implements PlatformAdapter {
     this.emitStatus(source);
 
     try {
-      const options: TikTokLiveConstructorConnectionOptions = {
-        processInitialData: true,
-        enableExtendedGiftInfo: false, // gift events still arrive over WS; skip paid gift/list/ prefetch
-        fetchRoomInfoOnConnect: true,
-      };
-
-      const signApiKey = resolveSignApiKey();
-      if (signApiKey) {
-        options.signApiKey = signApiKey;
-      }
-
       const sessionId = resolveTikTokSessionId();
-      if (sessionId) {
-        options.session = {
-          cookie: {
-            type: 'cookie',
-            value: {
-              sessionId,
-              ttTargetIdc: resolveTikTokTargetIdc(),
+      const signApiKey = resolveSignApiKey();
+
+      // Build options as one object so the session+authenticateWs discriminant type-checks.
+      // Authenticated WS is required for full chat; anonymous often only sees gifts.
+      const options: TikTokLiveConstructorConnectionOptions = sessionId
+        ? {
+            processInitialData: true,
+            enableExtendedGiftInfo: false, // gift events still arrive over WS; skip paid gift/list/ prefetch
+            fetchRoomInfoOnConnect: true,
+            authenticateWs: true,
+            session: {
+              cookie: {
+                type: 'cookie',
+                value: {
+                  sessionId,
+                  ttTargetIdc: resolveTikTokTargetIdc(),
+                },
+              },
             },
-          },
-        };
+            ...(signApiKey ? { signApiKey } : {}),
+          }
+        : {
+            processInitialData: true,
+            enableExtendedGiftInfo: false,
+            fetchRoomInfoOnConnect: true,
+            authenticateWs: false,
+            ...(signApiKey ? { signApiKey } : {}),
+          };
+
+      // SDK requires this env var when authenticateWs is true (must match SignConfig host).
+      if (sessionId) {
+        process.env.WHITELIST_AUTHENTICATED_SESSION_ID_HOST = resolveEulerSignHost();
       }
 
       // v2 class extends TypedEventEmitter at runtime; DT declaration omits `.on` on the class body.
@@ -201,6 +241,12 @@ export class TikTokAdapter implements PlatformAdapter {
       emitter.on(WebcastEvent.CHAT, (...args: unknown[]) => {
         const data = args[0] as Record<string, unknown>;
         const msg = mapTikTokChat(data, source);
+        if (msg) this.emitMessage(msg);
+      });
+
+      emitter.on(WebcastEvent.EMOTE, (...args: unknown[]) => {
+        const data = args[0] as Record<string, unknown>;
+        const msg = mapTikTokEmote(data, source);
         if (msg) this.emitMessage(msg);
       });
 
@@ -237,7 +283,8 @@ export class TikTokAdapter implements PlatformAdapter {
       const connected: StreamSource = {
         ...source,
         connected: true,
-        error: undefined,
+        // Non-fatal hint when anonymous — gifts work, chat is often filtered.
+        error: sessionId ? undefined : SESSION_CHAT_HINT,
       };
       this.channels.set(sourceId, { source: connected, connection });
       this.emitStatus(connected);
@@ -368,11 +415,64 @@ export function extractTikTokBadges(
   return badges;
 }
 
+/** Pull a displayable chat string from common connector / proto shapes. */
+function extractChatComment(data: Record<string, unknown>): string {
+  const nested = data.chatMessage;
+  const nestedObj =
+    nested && typeof nested === 'object'
+      ? (nested as Record<string, unknown>)
+      : undefined;
+
+  const candidates: unknown[] = [
+    data.comment,
+    data.text,
+    data.content,
+    nestedObj?.comment,
+    nestedObj?.text,
+    nestedObj?.content,
+  ];
+
+  for (const c of candidates) {
+    if (typeof c === 'string' && c.trim()) return c.trim();
+  }
+
+  // Emotes embedded on a chat message (subscriber stickers inline).
+  const emoteFallback = formatEmoteList(data.emotes ?? data.emoteList ?? nestedObj?.emotes);
+  if (emoteFallback) return emoteFallback;
+
+  return '';
+}
+
+function formatEmoteList(raw: unknown): string {
+  if (!Array.isArray(raw) || raw.length === 0) return '';
+  const parts: string[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const e = item as Record<string, unknown>;
+    // EmoteWithIndex nests under .emote; EmoteModel is flat.
+    const emote = (e.emote && typeof e.emote === 'object'
+      ? (e.emote as Record<string, unknown>)
+      : e) as Record<string, unknown>;
+    const id = emote.emoteId ?? emote.uuid ?? emote.id;
+    const image = emote.image as { urlList?: string[]; uri?: string } | undefined;
+    const url =
+      (Array.isArray(image?.urlList) && image.urlList[0]) ||
+      (typeof image?.uri === 'string' && image.uri) ||
+      '';
+    if (typeof id === 'string' && id) {
+      parts.push(url ? `[emote:${id}]` : `[emote:${id}]`);
+    } else if (url) {
+      parts.push('[emote]');
+    }
+  }
+  return parts.length ? parts.join(' ') : '';
+}
+
 function mapTikTokChat(
   data: Record<string, unknown>,
   source: StreamSource,
 ): ChatMessage | null {
-  const comment = String(data.comment ?? data.text ?? '');
+  const comment = extractChatComment(data);
   if (!comment) return null;
   const u = mapTikTokUser(data);
   return {
@@ -384,6 +484,30 @@ function mapTikTokChat(
     username: u.username,
     displayName: u.displayName,
     message: comment,
+    timestamp: Number(data.createTime ?? data.timestamp ?? Date.now()),
+    badges: u.badges,
+    avatarUrl: u.avatarUrl,
+  };
+}
+
+function mapTikTokEmote(
+  data: Record<string, unknown>,
+  source: StreamSource,
+): ChatMessage | null {
+  const emoteText =
+    formatEmoteList(data.emoteList ?? data.emotes) ||
+    extractChatComment(data) ||
+    '[emote]';
+  const u = mapTikTokUser(data);
+  return {
+    id: String(data.msgId ?? data.messageId ?? randomUUID()),
+    platform: 'tiktok',
+    channelId: source.id,
+    channelName: source.displayName,
+    userId: u.userId,
+    username: u.username,
+    displayName: u.displayName,
+    message: emoteText,
     timestamp: Number(data.createTime ?? data.timestamp ?? Date.now()),
     badges: u.badges,
     avatarUrl: u.avatarUrl,

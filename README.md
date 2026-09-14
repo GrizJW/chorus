@@ -19,13 +19,13 @@ Unified live-stream chat for **Twitch**, **YouTube**, and **TikTok** — one dar
 
 Grab the latest **Windows installer or portable `.exe`** from [GitHub Releases](https://github.com/GrizJW/chorus/releases):
 
-1. Open the newest release (e.g. `v1.0.4`)
-2. Download **`Chorus-1.0.4-x64.exe`** (NSIS installer) or **`Chorus-1.0.4-x64-portable.exe`** (no install)
+1. Open the newest release (e.g. `v1.0.5`)
+2. Download **`Chorus-1.0.5-x64.exe`** (NSIS installer) or **`Chorus-1.0.5-x64-portable.exe`** (no install)
 3. Run it — paste Twitch / YouTube / TikTok stream links in the sidebar
 
 The app is **unsigned** for v1, so Windows SmartScreen may warn (“Windows protected your PC”). Choose **More info → Run anyway**.
 
-Optional extras (YouTube Data API key, TikTok session / Euler Community key): create a `.env` in `%APPDATA%\Chorus\.env` using `.env.example`. **YouTube chat needs no Google Cloud key** (Innertube). **No Euler Business plan** for TikTok chat.
+Optional extras (YouTube Data API key, TikTok session / Euler Community key): create a `.env` in `%APPDATA%\Chorus\.env` using `.env.example`. **YouTube chat needs no Google Cloud key** (Innertube). **TikTok full chat needs `TIKTOK_SESSION_ID`** (gifts often work without it). **No Euler Business plan**.
 
 ## Quick start (contributors)
 
@@ -43,7 +43,7 @@ npm run dev
 **Paste a stream link** in the sidebar (Twitch, YouTube, or TikTok) and hit Connect. Live mode is the default (`DEMO_MODE=false`).
 
 - **Twitch** — works from a channel link / username; no keys required for public chat
-- **TikTok** — works from `@user/live` (or short links when resolvable); creator must be **LIVE**; no Euler Business plan needed. If connect still fails after updating, optionally set `TIKTOK_SESSION_ID` or a free Euler Community `TIKTOK_SIGN_API_KEY` in `%APPDATA%\Chorus\.env`
+- **TikTok** — works from `@user/live` (or short links when resolvable); creator must be **LIVE**; no Euler Business plan needed. **Gifts often work anonymously; full chat usually needs** `TIKTOK_SESSION_ID` (+ optional `TIKTOK_TT_TARGET_IDC`) in `%APPDATA%\Chorus\.env`. Free Euler Community `TIKTOK_SIGN_API_KEY` is an optional connect fallback only
 - **YouTube** — paste a live link / `@handle` while LIVE; **no API key required** (Innertube). Optional `YOUTUBE_API_KEY` is Data API fallback only
 
 ### Optional demo mode
@@ -70,7 +70,7 @@ npm start
 | --- | --- | --- | --- |
 | **Twitch** | No for public chat | `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET` (optional) | Anonymous `tmi.js` IRC reads public chat. Helix app token improves **channel-specific sub badge images** and display-name resolve. Create an app at [Twitch Dev Console](https://dev.twitch.tv/console/apps). |
 | **YouTube** | **No** for basic chat | Optional `YOUTUBE_API_KEY` | Default: unofficial **Innertube** (`youtubei.js`) — paste a live URL or `@handle` while LIVE. Optional official Data API v3 key is fallback only if Innertube fails. |
-| **TikTok** | No official keys; **no Euler Business plan** | Optional `TIKTOK_SESSION_ID`, `TIKTOK_TT_TARGET_IDC`, free Community `TIKTOK_SIGN_API_KEY` | Uses unofficial `tiktok-live-connector` **v2** with free rooms signing (gift catalog prefetch disabled). Creator must be **LIVE**. Do not buy Euler Business for Chorus chat. |
+| **TikTok** | Session cookie **recommended for full chat**; **no Euler Business plan** | `TIKTOK_SESSION_ID` + optional `TIKTOK_TT_TARGET_IDC` (chat); free Community `TIKTOK_SIGN_API_KEY` (connect fallback) | Uses unofficial `tiktok-live-connector` **v2** with free rooms signing (gift catalog prefetch disabled). Anonymous WS often gets **gifts only**; set session + `authenticateWs` for chat. Creator must be **LIVE**. Do not buy Euler Business. |
 
 Example `.env` (live by default):
 
@@ -83,7 +83,7 @@ CLIENT_ORIGIN=http://localhost:5173
 # TWITCH_CLIENT_SECRET=your_client_secret
 # Optional YouTube Data API fallback (Innertube needs no key):
 # YOUTUBE_API_KEY=your_api_key
-# TIKTOK_SESSION_ID=your_sessionid_cookie   # optional fallback if signing fails
+# TIKTOK_SESSION_ID=your_sessionid_cookie   # recommended for full chat (gifts work without it)
 # TIKTOK_TT_TARGET_IDC=useast1a            # from tt-target-idc cookie (optional)
 # TIKTOK_SIGN_API_KEY=                     # optional free Euler Community key — NOT Business
 ```
@@ -146,31 +146,36 @@ When the connector provides them, Chorus maps:
 
 - Unofficial — can break when TikTok changes Webcast/signing
 - Streamer must be **live**; offline usernames fail to connect
-- **No Euler Business plan** is required for chat. Chorus skips the paid gift-catalog prefetch; gift events still arrive over the live WebSocket
-- Session cookie / free Euler Community API key are optional fallbacks only (see below) — ignore any “Purchase a Business plan” message from older builds; update Chorus instead
+- **Anonymous WebSocket often receives gifts but filters chat heavily.** Full chat needs a logged-in TikTok session (`TIKTOK_SESSION_ID` + optional `TIKTOK_TT_TARGET_IDC`) so Chorus can enable authenticated WS
+- **No Euler Business plan** is required. Chorus skips the paid gift-catalog prefetch; gift events still arrive over the live WebSocket
+- Free Euler Community API key is an optional connect/signing fallback only — ignore any “Purchase a Business plan” message from older builds; update Chorus instead
 - Badge fields differ by library version / region; not every role TikTok shows in-app is always present
 - Not affiliated with ByteDance; use for personal/overlay tooling, not as a guaranteed production SLA
 
-#### Windows: optional fallbacks if TikTok connect still fails
+#### Windows: enable full TikTok chat (session cookie)
 
-Do **not** buy an Euler Business plan for Chorus. Chat connect uses free rooms signing.
+Do **not** buy an Euler Business plan for Chorus.
 
-If you still see a signing/403 error after updating to the latest build:
+Without a session, Chorus may connect and show **gifts** while **chat stays empty**. To get full chat:
 
-1. Prefer a **free** Euler Community API key from [eulerstream.com](https://www.eulerstream.com) as `TIKTOK_SIGN_API_KEY` in `%APPDATA%\Chorus\.env`
-2. Or set a logged-in TikTok `sessionid` cookie:
-   - In Chrome/Edge while logged into [tiktok.com](https://www.tiktok.com), open DevTools → **Application** → **Cookies** → `https://www.tiktok.com`
-   - Copy **`sessionid`** (and optionally **`tt-target-idc`**)
-3. Example `%APPDATA%\Chorus\.env` (folder is created after you run Chorus once):
+1. Run Chorus once so `%APPDATA%\Chorus\` exists
+2. Log into [tiktok.com](https://www.tiktok.com) in Chrome/Edge
+3. DevTools → **Application** → **Cookies** → `https://www.tiktok.com`
+4. Copy **`sessionid`** (and optionally **`tt-target-idc`**)
+5. Create or edit `%APPDATA%\Chorus\.env`:
 
 ```env
-# Optional — only if connect still fails after updating
-TIKTOK_SIGN_API_KEY=your_free_community_key
+# Required for full TikTok chat (gifts work without this)
 TIKTOK_SESSION_ID=paste_sessionid_here
+# Optional — from the tt-target-idc cookie (default useast1a)
 TIKTOK_TT_TARGET_IDC=useast1a
+# Optional — free Euler Community key only if connect/signing still fails
+# TIKTOK_SIGN_API_KEY=your_free_community_key
 ```
 
-4. Restart Chorus and reconnect while the creator is **LIVE**
+6. Fully quit and restart Chorus, then reconnect while the creator is **LIVE**
+
+If connect still fails with a signing/403 after that, add a **free** Euler Community API key from [eulerstream.com](https://www.eulerstream.com) as `TIKTOK_SIGN_API_KEY` (still do not buy Business).
 
 ## Architecture
 

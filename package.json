@@ -1,6 +1,6 @@
 {
   "name": "chorus",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "private": true,
   "description": "Unified live-stream chat from Twitch, YouTube, and TikTok",
   "type": "module",
