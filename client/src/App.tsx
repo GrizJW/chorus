@@ -8,7 +8,7 @@ import { PlatformIcon, platformLabel } from './components/PlatformIcon';
 type Filter = Platform | 'all';
 
 export default function App() {
-  const { messages, streams, demoMode, connected, error, addStream, removeStream } =
+  const { messages, streams, demoMode, connected, error, addStream, removeStream, clearMessages } =
     useChatSocket();
   const [filter, setFilter] = useState<Filter>('all');
 
@@ -49,6 +49,14 @@ export default function App() {
               <span className="count">{counts[f]}</span>
             </button>
           ))}
+          <button
+            type="button"
+            className="chip chip-danger"
+            onClick={clearMessages}
+            title="Clear the message feed. Streams stay connected."
+          >
+            Clear chat
+          </button>
           <div className="spacer" />
           <span className="hint" style={{ margin: 0 }}>
             Hover chat to pause auto-scroll

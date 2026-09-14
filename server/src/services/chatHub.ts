@@ -9,6 +9,7 @@ import type { PlatformAdapter } from '../adapters/types.js';
 export type HubListener = {
   onMessage: (msg: ChatMessage) => void;
   onStreamUpdate: (source: StreamSource) => void;
+  onClear?: () => void;
 };
 
 export class ChatHub {
@@ -46,6 +47,12 @@ export class ChatHub {
 
   getRecentMessages(): ChatMessage[] {
     return [...this.recent];
+  }
+
+  /** Wipe the in-memory recent buffer. Does not disconnect live streams. */
+  clearMessages(): void {
+    this.recent = [];
+    for (const l of this.listeners) l.onClear?.();
   }
 
   getStreams(): StreamSource[] {

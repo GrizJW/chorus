@@ -92,6 +92,11 @@ export function startChorusServer(options: ChorusServerOptions = {}): Promise<Ch
     }
   });
 
+  app.delete('/api/messages', (_req, res) => {
+    hub.clearMessages();
+    res.json({ ok: true });
+  });
+
   if (isProd) {
     const clientDist = resolveClientDist(options.clientDist);
     if (!fs.existsSync(path.join(clientDist, 'index.html'))) {
@@ -123,6 +128,7 @@ export function startChorusServer(options: ChorusServerOptions = {}): Promise<Ch
     const unsubscribe = hub.subscribe({
       onMessage: (payload) => send(ws, { type: 'message', payload }),
       onStreamUpdate: (payload) => send(ws, { type: 'stream_update', payload }),
+      onClear: () => send(ws, { type: 'messages_cleared' }),
     });
 
     ws.on('message', async (raw) => {
@@ -144,6 +150,8 @@ export function startChorusServer(options: ChorusServerOptions = {}): Promise<Ch
           send(ws, { type: 'streams', payload: hub.getStreams() });
         } else if (data.type === 'list_streams') {
           send(ws, { type: 'streams', payload: hub.getStreams() });
+        } else if (data.type === 'clear_messages') {
+          hub.clearMessages();
         }
       } catch (err) {
         send(ws, {

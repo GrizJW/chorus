@@ -65,6 +65,9 @@ export function useChatSocket() {
           case 'messages':
             setMessages(data.payload);
             break;
+          case 'messages_cleared':
+            setMessages([]);
+            break;
           case 'streams':
             setStreams(data.payload);
             break;
@@ -143,6 +146,15 @@ export function useChatSocket() {
     [send],
   );
 
+  const clearMessages = useCallback(() => {
+    setMessages([]);
+    void fetch('/api/messages', { method: 'DELETE' }).catch(() => {});
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'clear_messages' }));
+    }
+  }, []);
+
   return {
     messages,
     streams,
@@ -152,5 +164,6 @@ export function useChatSocket() {
     setError,
     addStream,
     removeStream,
+    clearMessages,
   };
 }

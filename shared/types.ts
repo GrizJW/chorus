@@ -51,11 +51,13 @@ export interface StreamSource {
 export type ClientToServer =
   | { type: 'add_stream'; input: string }
   | { type: 'remove_stream'; id: string }
-  | { type: 'list_streams' };
+  | { type: 'list_streams' }
+  | { type: 'clear_messages' };
 
 export type ServerToClient =
   | { type: 'message'; payload: ChatMessage }
   | { type: 'messages'; payload: ChatMessage[] }
+  | { type: 'messages_cleared' }
   | { type: 'streams'; payload: StreamSource[] }
   | { type: 'stream_update'; payload: StreamSource }
   | { type: 'error'; payload: { message: string } }
