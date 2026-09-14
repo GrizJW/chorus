@@ -36,16 +36,7 @@ export function ChatFeed({
   return (
     <>
       {(paused || !sticky) && (
-        <div
-          style={{
-            position: 'absolute',
-            right: 24,
-            bottom: 24,
-            zIndex: 2,
-            display: 'flex',
-            gap: 8,
-          }}
-        >
+        <div className="chat-float">
           {paused && <span className="pause-hint">Paused on hover</span>}
           {!sticky && (
             <button

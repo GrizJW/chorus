@@ -1,6 +1,6 @@
 {
   "name": "chorus",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "private": true,
   "description": "Unified live-stream chat from Twitch, YouTube, and TikTok",
   "type": "module",
@@ -50,7 +50,7 @@
   "build": {
     "appId": "com.grizjw.chorus",
     "productName": "Chorus",
-    "copyright": "Copyright © 2026 GrizJW",
+    "copyright": "Copyright \u00a9 2026 GrizJW",
     "directories": {
       "output": "release",
       "buildResources": "electron/resources"

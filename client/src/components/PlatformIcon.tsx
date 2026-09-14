@@ -66,13 +66,13 @@ export function PlatformIcon({
       className="msg-platform"
       style={{
         background: bg,
-        boxShadow: `0 6px 16px ${
+        boxShadow: `0 4px 14px ${
           platform === 'twitch'
-            ? 'rgba(145,70,255,.35)'
+            ? 'rgba(145,70,255,.32)'
             : platform === 'youtube'
-              ? 'rgba(255,0,51,.28)'
-              : 'rgba(254,44,85,.28)'
-        }`,
+              ? 'rgba(255,0,51,.26)'
+              : 'rgba(254,44,85,.26)'
+        }, inset 0 1px 0 rgba(255,255,255,.22)`,
       }}
       title={platform}
     >

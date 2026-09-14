@@ -1,6 +1,6 @@
 # Chorus
 
-Unified live-stream chat for **Twitch**, **YouTube**, and **TikTok** — one dark, streamer-friendly UI with platform icons and native role badges.
+Unified live-stream chat for **Twitch**, **YouTube**, and **TikTok** — one **Apple liquid glass** UI — soft frosted panels, subtle borders, and smooth motion — with platform icons and native role badges.
 
 ![Stack](https://img.shields.io/badge/TypeScript-Vite%20%2B%20React%20%2B%20Node-8b7cff)
 
@@ -20,8 +20,8 @@ Unified live-stream chat for **Twitch**, **YouTube**, and **TikTok** — one dar
 
 Grab the latest **Windows installer or portable `.exe`** from [GitHub Releases](https://github.com/GrizJW/chorus/releases):
 
-1. Open the newest release (e.g. `v1.0.6`)
-2. Download **`Chorus-1.0.6-x64.exe`** (NSIS installer) or **`Chorus-1.0.6-x64-portable.exe`** (no install)
+1. Open the newest release (e.g. `v1.0.7`)
+2. Download **`Chorus-1.0.7-x64.exe`** (NSIS installer) or **`Chorus-1.0.7-x64-portable.exe`** (no install)
 3. Run it — paste Twitch / YouTube / TikTok stream links in the sidebar
 
 The app is **unsigned** for v1, so Windows SmartScreen may warn (“Windows protected your PC”). Choose **More info → Run anyway**.
@@ -182,7 +182,7 @@ If connect still fails with a signing/403 after that, add a **free** Euler Commu
 
 ```
 chorus/
-  client/          Vite + React UI (dark chat, filters, badges)
+  client/          Vite + React UI (liquid glass chat, filters, badges)
   server/          Express + WebSocket hub
     adapters/      twitch.ts | youtube.ts | tiktok.ts | demo.ts
   electron/        Desktop shell (starts API, loads built UI)
