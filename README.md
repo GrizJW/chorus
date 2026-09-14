@@ -12,6 +12,7 @@ Unified live-stream chat for **Twitch**, **YouTube**, and **TikTok** — one dar
 - Timestamps, auto-scroll with **pause-on-hover**, jump-to-latest
 - Filter chat by platform
 - **Clear chat** button in the chat toolbar (wipes the feed; streams stay connected)
+- **Focus chat** — hide the connect sidebar for fullscreen chat (toolbar toggle; Esc exits; preference saved)
 - Optional **demo mode** (`DEMO_MODE=true`) with sample messages + badges (no API keys)
 - Live connectors: Twitch (IRC + Helix badges), YouTube (Live Chat API), TikTok (unofficial Webcast)
 
@@ -19,8 +20,8 @@ Unified live-stream chat for **Twitch**, **YouTube**, and **TikTok** — one dar
 
 Grab the latest **Windows installer or portable `.exe`** from [GitHub Releases](https://github.com/GrizJW/chorus/releases):
 
-1. Open the newest release (e.g. `v1.0.5`)
-2. Download **`Chorus-1.0.5-x64.exe`** (NSIS installer) or **`Chorus-1.0.5-x64-portable.exe`** (no install)
+1. Open the newest release (e.g. `v1.0.6`)
+2. Download **`Chorus-1.0.6-x64.exe`** (NSIS installer) or **`Chorus-1.0.6-x64-portable.exe`** (no install)
 3. Run it — paste Twitch / YouTube / TikTok stream links in the sidebar
 
 The app is **unsigned** for v1, so Windows SmartScreen may warn (“Windows protected your PC”). Choose **More info → Run anyway**.

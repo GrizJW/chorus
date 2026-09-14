@@ -506,3 +506,13 @@ button {
   line-height: 1.5;
   font-size: 0.9rem;
 }
+
+/* Fullscreen chat — hide connect sidebar */
+.app-shell.focus-chat {
+  grid-template-columns: 1fr;
+  max-width: none;
+}
+
+.app-shell.focus-chat .chat-panel {
+  margin: 0;
+}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Platform } from '@shared/types';
 import { useChatSocket } from './hooks/useChatSocket';
 import { Sidebar } from './components/Sidebar';
@@ -7,10 +7,38 @@ import { PlatformIcon, platformLabel } from './components/PlatformIcon';
 
 type Filter = Platform | 'all';
 
+const FOCUS_KEY = 'chorus-focus-chat';
+
+function readFocusPref(): boolean {
+  try {
+    return localStorage.getItem(FOCUS_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 export default function App() {
   const { messages, streams, demoMode, connected, error, addStream, removeStream, clearMessages } =
     useChatSocket();
   const [filter, setFilter] = useState<Filter>('all');
+  const [focusChat, setFocusChat] = useState(readFocusPref);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(FOCUS_KEY, focusChat ? '1' : '0');
+    } catch {
+      /* ignore quota / private mode */
+    }
+  }, [focusChat]);
+
+  useEffect(() => {
+    if (!focusChat) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setFocusChat(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [focusChat]);
 
   const counts = useMemo(() => {
     const c: Record<Filter, number> = {
@@ -26,15 +54,17 @@ export default function App() {
   const filters: Filter[] = ['all', 'twitch', 'youtube', 'tiktok'];
 
   return (
-    <div className="app-shell">
-      <Sidebar
-        streams={streams}
-        demoMode={demoMode}
-        connected={connected}
-        error={error}
-        onAdd={addStream}
-        onRemove={removeStream}
-      />
+    <div className={`app-shell${focusChat ? ' focus-chat' : ''}`}>
+      {!focusChat && (
+        <Sidebar
+          streams={streams}
+          demoMode={demoMode}
+          connected={connected}
+          error={error}
+          onAdd={addStream}
+          onRemove={removeStream}
+        />
+      )}
 
       <main className="panel chat-panel" style={{ position: 'relative' }}>
         <div className="toolbar">
@@ -57,9 +87,22 @@ export default function App() {
           >
             Clear chat
           </button>
+          <button
+            type="button"
+            className={`chip${focusChat ? ' active' : ''}`}
+            onClick={() => setFocusChat((v) => !v)}
+            title={
+              focusChat
+                ? 'Show connect sidebar (Esc)'
+                : 'Hide connect sidebar — fullscreen chat'
+            }
+            aria-pressed={focusChat}
+          >
+            {focusChat ? 'Exit focus' : 'Focus chat'}
+          </button>
           <div className="spacer" />
           <span className="hint" style={{ margin: 0 }}>
-            Hover chat to pause auto-scroll
+            {focusChat ? 'Esc exits focus · Hover chat to pause auto-scroll' : 'Hover chat to pause auto-scroll'}
           </span>
         </div>
         <ChatFeed messages={messages} filter={filter} />
